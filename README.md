@@ -1,2 +1,1 @@
-# Smart_Lock
-The final project of NCKU FreeRTOS class 
+# Smart_Lock_lab1Based
