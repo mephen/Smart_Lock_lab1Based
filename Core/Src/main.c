@@ -593,6 +593,7 @@ void lock_task(void *pvParameters){
   HD44780_Init(2);//lcd init, should be called in "task"
   HD44780_Clear();//clean screen
   uint8_t keyPressed = 0;
+  lock_bee();
   while(1){
     char lock_str[16] = "LOCK!";
     HAL_GPIO_TogglePin(GPIOD, LED_Green_Pin);
