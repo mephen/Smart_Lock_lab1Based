@@ -45,7 +45,7 @@
 ../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c:3040:13:UART_DMAReceiveCplt	120	static,ignoring_inline_asm
 ../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c:3097:13:UART_DMARxHalfCplt	24	static
 ../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c:3132:13:UART_DMAError	24	static
-../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c:3174:26:UART_WaitOnFlagUntilTimeout	24	static
+../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c:3174:26:UART_WaitOnFlagUntilTimeout	72	static,ignoring_inline_asm
 ../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c:3213:19:UART_Start_Receive_IT	24	static
 ../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c:3251:19:UART_Start_Receive_DMA	104	static,ignoring_inline_asm
 ../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c:3304:13:UART_EndTxTransfer	40	static,ignoring_inline_asm

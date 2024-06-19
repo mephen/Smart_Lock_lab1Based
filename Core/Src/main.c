@@ -105,6 +105,7 @@ char key;
 char enteredPin[5];
 uint8_t entered = 0;
 const char setPin[4] = {'1', '2', '3', '4'};
+char newPin[5] = {'\0'};
 uint8_t newPinSet = 0;
 QueueHandle_t keypadQueue;
 
@@ -358,6 +359,65 @@ uint8_t rc522_check(){
   return card_exist;
 }
 
+void setpin(){
+  HD44780_Init(2);
+  HD44780_Clear();
+  HD44780_PrintStr("Entering PIN:");     
+  HD44780_SetCursor(0, 1);
+  bool isButtonPressed = false;
+  char enteredPin[5] = {0};
+  uint8_t local_entered = 0;
+  // bool newPinSet = false;   
+  while (local_entered < 4) {
+    key = read_keypad();
+    if (key != '\0' && !isButtonPressed) {
+      if (key >= '0' && key <= '9' && local_entered < 4) {
+          strncat(enteredPin, &key, 1);
+          local_entered++;
+          HD44780_PrintStr("*");
+      } else if (key == 'C' && local_entered > 0) {
+          enteredPin[local_entered - 1] = '\0';
+          local_entered--;
+          for(int i = 0; i < local_entered; i++) {
+              HD44780_PrintStr("*");
+          }
+      }
+      if (local_entered == 4) {
+          strncpy(newPin, enteredPin, 4);
+          // newPinSet = true;
+          enteredPin[0] = '\0';
+          HD44780_Clear();
+          HD44780_PrintStr("PIN Set!");
+          uint32_t From_begin_time = HAL_GetTick();
+          while(HAL_GetTick() - From_begin_time < 1000/portTICK_RATE_MS){//wait 3s for push button 
+            ;
+          }
+      }
+      isButtonPressed = true;  // Mark the button as pressed
+    }else if (key == '\0') {
+        isButtonPressed = false;  // Reset button press state
+    }
+  }
+  return;
+}
+
+void unlock_fn_setpin() {
+    HD44780_Init(2);//lcd init, should be called in "task"
+    HD44780_Clear();
+    char unlock[16] = "UNLOCK!";
+    HD44780_PrintStr(unlock);
+    char add_Card_str[16] = "Set pin";
+    HD44780_SetCursor(0,1);//move cursor to the first word of the second line
+    HD44780_PrintStr(add_Card_str);
+    uint32_t From_begin_time = HAL_GetTick();
+    while(HAL_GetTick() - From_begin_time < 3000/portTICK_RATE_MS){//wait 3s for push button 
+      if(debounce(HAL_GPIO_ReadPin(btn_blue_GPIO_Port, GPIO_PIN_0))){//push button
+        setpin();
+        return;
+      }
+    }
+}
+
 uint8_t keypad_check() {
     printf("Entered keypad_check()\n");  
     char enteredPin[5] = {0};
@@ -403,7 +463,7 @@ uint8_t keypad_check() {
     }
 
     if (entered == 4) {
-        if (strncmp(enteredPin, setPin, 4) == 0) {
+        if (strncmp(enteredPin, setPin, 4) == 0 || (strncmp(enteredPin, newPin, 4) == 0)) {
             HD44780_Clear();
             HD44780_SetCursor(0, 0);
             HD44780_PrintStr("UNLOCKED");
@@ -430,50 +490,6 @@ uint8_t bluetooth_check(){
 	return 0;
 }
 
-// uint8_t unlock_fn_AddCard(){
-//   char add_Card_str[16] = "Add Card";
-//   HD44780_SetCursor(0,1);//move cursor to the first word of the second line
-//   HD44780_PrintStr(add_Card_str);
-//   uint32_t From_begin_time = HAL_GetTick();
-//   while(HAL_GetTick() - From_begin_time < 1000/portTICK_RATE_MS){ //busy waiting 1000 ms, can't use vTaskDelay
-//     if(debounce(HAL_GPIO_ReadPin(btn_blue_GPIO_Port, GPIO_PIN_0))){//push button
-//       rc522_add_card();
-//       return 1;//do rc522_add_card
-//     }
-//   }
-//   return 0;//do nothing
-// }
-
-// uint8_t unlock_fn_DelCard(){
-//   char del_Card_str[16] = "Del Card";
-//   HD44780_SetCursor(0,1);
-//   HD44780_PrintStr(del_Card_str);
-//   uint32_t From_begin_time = HAL_GetTick();
-//   while(HAL_GetTick() - From_begin_time < 1000/portTICK_RATE_MS){ 
-//     if(debounce(HAL_GPIO_ReadPin(btn_blue_GPIO_Port, GPIO_PIN_0))){
-//       uint8_t del[5] = {211,113,208,2,112};
-//       rc522_delete_card(del);
-//       return 1;//do rc522_delete_card
-//     }
-//   }
-//   return 0;//do nothing
-// }
-
-// uint8_t unlock_fn_Lock(){
-//   char del_Card_str[16] = "LOCK!";
-//   HD44780_SetCursor(0,1);
-//   HD44780_PrintStr(del_Card_str);
-//   uint32_t From_begin_time = HAL_GetTick();
-//   while(HAL_GetTick() - From_begin_time < 1000/portTICK_RATE_MS){ 
-//     if(debounce(HAL_GPIO_ReadPin(btn_blue_GPIO_Port, GPIO_PIN_0))){
-//       vTaskResume(xHandle_lock_task);
-//       unlock_bee();
-//       return 1;//switch to lock_task
-//     }
-//   }
-//   return 0;//do nothing
-// }
-
 void unlock_fn_AddCard(){
   HD44780_Init(2);//lcd init, should be called in "task"
   HD44780_Clear();//clean screen
@@ -486,6 +502,7 @@ void unlock_fn_AddCard(){
   while(HAL_GetTick() - From_begin_time < 3000/portTICK_RATE_MS){//wait 3s for push button 
     if(debounce(HAL_GPIO_ReadPin(btn_blue_GPIO_Port, GPIO_PIN_0))){//push button
       rc522_add_card();
+      return;
     }
   }
 }
@@ -572,76 +589,6 @@ void unlock_bee(){
   HAL_GPIO_WritePin(GPIOD, Bee_Pin, GPIO_PIN_RESET);
 }
 
-// void lock_task(void *pvParameters){
-//   HD44780_Init(2);//lcd init, should be called in "task"
-//   HD44780_Clear();//clean screen
-//   while(1){
-//     char lock_str[16] = "LOCK!";
-//     HAL_GPIO_TogglePin(GPIOD, LED_Green_Pin);
-//     HD44780_PrintStr(lock_str);
-//     uint8_t unlock = 0;
-//     unlock = rc522_check();//str_1
-//     if(unlock){
-//       vTaskSuspend(xHandle_lock_task);
-//       lock_bee();
-//     }
-
-//     uint32_t From_begin_time = HAL_GetTick();
-//     while(HAL_GetTick() - From_begin_time < 300/portTICK_RATE_MS){ //busy waiting 300 ms, can't use vTaskDelay
-//       //todo: password check
-//       // unlock = password_check();//str_2
-//       // if(unlock){
-//       //   vTaskSuspend(xHandle_lock_task);
-//       //   lock_bee();
-//       // }
-//       ;
-//     }
-
-//     // unlock = bluetooth_check();//wait 300ms for bluetooth signal
-//     // if(unlock){
-//     //   vTaskSuspend(xHandle_lock_task);
-//     //   lock_bee();
-//     // }
-
-//     HD44780_Clear();
-//   }
-// }
-
-// void unlock_task(void *pvParameters){
-//   HD44780_Init(2);//lcd init, should be called in "task"
-//   HD44780_Clear();//clean screen
-//   uint32_t timeout_count = HAL_GetTick();
-//   unlock_bee();
-//   while(1){
-//     char unlock_str[16] = "UNLOCK!";
-//     HD44780_PrintStr(unlock_str);
-//     uint8_t fn_execute = 0;
-//     //test
-//     //add card: 1000ms
-//     fn_execute = unlock_fn_AddCard();
-//     if(fn_execute){
-//       timeout_count = HAL_GetTick();//reset timeout_count
-//     }
-//     //del card: 1000ms
-//     fn_execute = unlock_fn_DelCard();
-//     if(fn_execute){
-//       timeout_count = HAL_GetTick();//reset timeout_count
-//     }
-//     //switch to lock_task
-//     fn_execute = unlock_fn_Lock();
-//     if(fn_execute){
-//       timeout_count = HAL_GetTick();//reset timeout_count
-//     }
-
-//     HD44780_Clear();
-//     if(HAL_GetTick() - timeout_count < 5000/portTICK_RATE_MS){//if 5s passed, switch to lock_task
-//       vTaskResume(xHandle_lock_task);//switch to lock_task
-//       timeout_count = HAL_GetTick();
-//     }
-//   }
-// }
-
-
 void lock_task(void *pvParameters){
   HD44780_Init(2);//lcd init, should be called in "task"
   HD44780_Clear();//clean screen
@@ -653,6 +600,7 @@ void lock_task(void *pvParameters){
     uint8_t unlock = 0;
     unlock = rc522_check();//str_1
     if(unlock){
+      HAL_UART_Transmit(&huart3, (uint8_t*)"1", 14, 1000);//1:card_unlock
       vTaskSuspend(xHandle_lock_task);
       lock_bee();
     }
@@ -663,6 +611,7 @@ void lock_task(void *pvParameters){
         if (key != '\0' && !keyPressed) {
             keyPressed = 1;
             if (keypad_check()) {
+                HAL_UART_Transmit(&huart3, (uint8_t*)"2", 14, 1000);//2:password_unlock
                 vTaskSuspend(xHandle_lock_task);
                 lock_bee();
             }
@@ -675,6 +624,7 @@ void lock_task(void *pvParameters){
     if(unlock){
       // char* device = "BT";
       // sendLogToServer(device);
+      HAL_UART_Transmit(&huart3, (uint8_t*)"3", 14, 1000);//3:bluetooth_unlock
       vTaskSuspend(xHandle_lock_task);
       lock_bee();
     }
@@ -701,90 +651,92 @@ void unlock_task(void *pvParameters){
     if (key == 'C'){
       unlock_fn_Lock();
     }
-
+    if (key == 'D'){
+      unlock_fn_setpin();
+    }
     HD44780_Clear();
   }
 }
 
-void sendCommand(UART_HandleTypeDef *huart, char* cmd) {
-    HAL_UART_Transmit(huart, (uint8_t*)cmd, strlen(cmd), 1000);
-}
+// void sendCommand(UART_Handlsd) {
+//     HAL_UART_Transmit(huart, (uint8_t*)cmd, strlen(cmd), 1000);
+// }
 
-void receiveResponse(UART_HandleTypeDef *huart, uint8_t *buffer, uint16_t bufferSize) {
-    HAL_UART_Receive(huart, buffer, bufferSize, 1000);
-}
+// void receiveResponse(UART_HandleTypeDef *huart, uint8_t *buffer, uint16_t bufferSize) {
+//     HAL_UART_Receive(huart, buffer, bufferSize, 1000);
+// }
 
-void sendLogToServer(const char* device) {
-    char httpRequest[256];
-    char httpCmd[64];
-    char rxBuffer[256];
+// void sendLogToServer(const char* device) {
+//     char httpRequest[256];
+//     char httpCmd[64];
+//     char rxBuffer[256];
 
-    memset(rxBuffer,'\0',sizeof(rxBuffer));
-    sendCommand(&huart1, "AT+CIPSTART=\"TCP\",\"192.168.50.94\",8000\r\n");
-    receiveResponse(&huart1, rxBuffer, sizeof(rxBuffer));
+//     memset(rxBuffer,'\0',sizeof(rxBuffer));
+//     sendCommand(&huart1, "AT+CIPSTART=\"TCP\",\"192.168.50.94\",8000\r\n");
+//     receiveResponse(&huart1, rxBuffer, sizeof(rxBuffer));
   
-    // Create the JSON payload
-    snprintf(httpRequest, sizeof(httpRequest),
-             "POST /log HTTP/1.1\r\n"
-             "Host: 192.168.1.115:8000\r\n"
-             "Content-Type: application/json\r\n"
-             "Content-Length: %d\r\n"
-             "\r\n"
-             "{\"device\":\"%s\"}",
-             strlen(device) + 13, device);
+//     // Create the JSON payload
+//     snprintf(httpRequest, sizeof(httpRequest),
+//              "POST /log HTTP/1.1\r\n"
+//              "Host: 192.168.1.115:8000\r\n"
+//              "Content-Type: application/json\r\n"
+//              "Content-Length: %d\r\n"
+//              "\r\n"
+//              "{\"device\":\"%s\"}",
+//              strlen(device) + 13, device);
  
-    // Calculate the length of the HTTP request
-    int httpRequestLength = strlen(httpRequest);
+//     // Calculate the length of the HTTP request
+//     int httpRequestLength = strlen(httpRequest);
  
-    // Create the AT+CIPSEND command with the correct length
-    snprintf(httpCmd, sizeof(httpCmd), "AT+CIPSEND=%d\r\n", httpRequestLength);
+//     // Create the AT+CIPSEND command with the correct length
+//     snprintf(httpCmd, sizeof(httpCmd), "AT+CIPSEND=%d\r\n", httpRequestLength);
  
-    // Clear the receive buffer
-    memset(rxBuffer, '\0', sizeof(rxBuffer));
+//     // Clear the receive buffer
+//     memset(rxBuffer, '\0', sizeof(rxBuffer));
  
-    // Send the AT+CIPSEND command
-    sendCommand(&huart1, httpCmd);
+//     // Send the AT+CIPSEND command
+//     sendCommand(&huart1, httpCmd);
  
-    // Receive the response (wait for ">")
-    receiveResponse(&huart1, rxBuffer, sizeof(rxBuffer));
+//     // Receive the response (wait for ">")
+//     receiveResponse(&huart1, rxBuffer, sizeof(rxBuffer));
  
-    // Check if the response contains ">"
-    if (strstr(rxBuffer, ">") != NULL) {
-        // Clear the receive buffer
-        memset(rxBuffer, '\0', sizeof(rxBuffer));
+//     // Check if the response contains ">"
+//     if (strstr(rxBuffer, ">") != NULL) {
+//         // Clear the receive buffer
+//         memset(rxBuffer, '\0', sizeof(rxBuffer));
  
-        // Send the actual HTTP request
-        sendCommand(&huart1, httpRequest);
+//         // Send the actual HTTP request
+//         sendCommand(&huart1, httpRequest);
  
-        // Receive the response
-        receiveResponse(&huart1, rxBuffer, sizeof(rxBuffer));
-    }
+//         // Receive the response
+//         receiveResponse(&huart1, rxBuffer, sizeof(rxBuffer));
+//     }
 
-    memset(rxBuffer, '\0', sizeof(rxBuffer));
-    sendCommand(&huart1, "AT+CIPCLOSE\r\n");
-    receiveResponse(&huart1, rxBuffer, sizeof(rxBuffer));
-}
+//     memset(rxBuffer, '\0', sizeof(rxBuffer));
+//     sendCommand(&huart1, "AT+CIPCLOSE\r\n");
+//     receiveResponse(&huart1, rxBuffer, sizeof(rxBuffer));
+// }
 
-void vEsp8266Init(){
-      char rxBuffer[512];
- 
-      memset(rxBuffer,'\0',sizeof(rxBuffer));
-      sendCommand(&huart2, "AT\r\n");
-      receiveResponse(&huart2, rxBuffer, sizeof(rxBuffer));
- 
-      memset(rxBuffer,'\0',sizeof(rxBuffer));
-      sendCommand(&huart2, "AT+CWMODE=1\r\n");
-      receiveResponse(&huart2, rxBuffer, sizeof(rxBuffer));
- 
-      memset(rxBuffer,'\0',sizeof(rxBuffer));
-      sendCommand(&huart2, "AT+CWJAP=\"92902\",\"00092902\"\r\n");
-      receiveResponse(&huart2, rxBuffer, sizeof(rxBuffer));
- 
- 
-      memset(rxBuffer,'\0',sizeof(rxBuffer));
-      sendCommand(&huart2, "AT+CIPMUX=0\r\n");
-      receiveResponse(&huart2, rxBuffer, sizeof(rxBuffer));
-}
+// void vEsp8266Init(){
+//       char rxBuffer[512];
+
+//       memset(rxBuffer,'\0',sizeof(rxBuffer));
+//       sendCommand(&huart2, "AT\r\n");
+//       receiveResponse(&huart2, rxBuffer, sizeof(rxBuffer));
+
+//       memset(rxBuffer,'\0',sizeof(rxBuffer));
+//       sendCommand(&huart2, "AT+CWMODE=1\r\n");
+//       receiveResponse(&huart2, rxBuffer, sizeof(rxBuffer));
+
+//       memset(rxBuffer,'\0',sizeof(rxBuffer));
+//       sendCommand(&huart2, "AT+CWJAP=\"92902\",\"00092902\"\r\n");
+//       receiveResponse(&huart2, rxBuffer, sizeof(rxBuffer));
+
+
+//       memset(rxBuffer,'\0',sizeof(rxBuffer));
+//       sendCommand(&huart2, "AT+CIPMUX=0\r\n");
+//       receiveResponse(&huart2, rxBuffer, sizeof(rxBuffer));
+// }
 
 
 /* USER CODE END 0 */
@@ -1237,7 +1189,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 9600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
